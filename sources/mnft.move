@@ -11,19 +11,21 @@ module mnft::mnft {
     struct MNFT has drop {}
 
     struct M_NFT has key, store {
-        id: UID
+        id: UID,
+        index: u64
     }
 
     struct SupplyManager has key, store {
         id: UID,
+        starting_index: u64,
         current_supply: u64,
     }
 
     const TOTAL_SUPPLY: u64 = 1000000;
-    const CAP_PER_SUPPLY_MANAGER: u64 = 1000;
+    const CAP_PER_SUPPLY_MANAGER: u64 = 500;
     const SUPPLY_MANAGER_COUNT: u64 = TOTAL_SUPPLY / CAP_PER_SUPPLY_MANAGER;
 
-    // 1000000 / 1000 = 1000, will have 1000 supply managers in parallel.
+    // 1000000 / 5000 = 2000, will have 2000 supply managers in parallel.
 
     fun init(otw: MNFT, ctx: &mut TxContext) {
         let keys = vector[
@@ -35,10 +37,10 @@ module mnft::mnft {
         ];
 
         let values = vector[
-            utf8(b"1 Million NFT in 90 second"),
+            utf8(b"1 Million NFT in 90 second #{index}"),
             utf8(b"https://i.imgur.com/deg7u4X.png"),
-            utf8(b"100k bounty! Yes!"),
-            utf8(b"https://github.com/EasonC13"),
+            utf8(b"100k + 100k bounty! Yes! This is the {index}/1000000 th NFT!"),
+            utf8(b"https://github.com/EasonC13/1M-NFT"),
             utf8(b"Eason"),
         ];
 
@@ -56,6 +58,7 @@ module mnft::mnft {
         loop {
             let supply_manager = SupplyManager{
                 id: object::new(ctx),
+                starting_index: index * CAP_PER_SUPPLY_MANAGER,
                 current_supply: 0,
             };
             transfer::share_object(supply_manager);
@@ -72,6 +75,7 @@ module mnft::mnft {
     ): M_NFT {
         let nft = M_NFT {
             id: object::new(ctx),
+            index: supplyManager.starting_index + supplyManager.current_supply,
         };
         assert!(supplyManager.current_supply < CAP_PER_SUPPLY_MANAGER, 0);
         supplyManager.current_supply = supplyManager.current_supply + 1;
@@ -99,15 +103,16 @@ module mnft::mnft {
     public fun split_gas_coins<T>(
         coin_input: Coin<T>,
         amount: u64,
+        balacne_each: u64,
         ctx: &mut TxContext,
     ) {
         let total = coin::value(&coin_input);
-        let split = total / amount;
-        let counter = 1;
+        let counter = 0;
         loop {
             // coin::split(coin_input, split);
-            let splitted_coin = coin::split(&mut coin_input, split, ctx);
+            let splitted_coin = coin::split(&mut coin_input, balacne_each, ctx);
             transfer::public_transfer(splitted_coin, tx_context::sender(ctx));
+            counter = counter + 1;
             if (counter == amount) {
                 break
             }
