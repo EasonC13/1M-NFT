@@ -2,6 +2,7 @@
 module mnft::mnft {
     use std::string::utf8;
     use sui::object::{Self, UID};
+    use sui::coin::{Self, Coin};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
     use sui::package;
@@ -18,9 +19,11 @@ module mnft::mnft {
         current_supply: u64,
     }
 
-    const TOTAL_SUPPLY: u64 = 10000000;
-    const CAP_PER_SUPPLY_MANAGER: u64 = 100000;
+    const TOTAL_SUPPLY: u64 = 1000000;
+    const CAP_PER_SUPPLY_MANAGER: u64 = 1000;
     const SUPPLY_MANAGER_COUNT: u64 = TOTAL_SUPPLY / CAP_PER_SUPPLY_MANAGER;
+
+    // 1000000 / 1000 = 1000, will have 1000 supply managers in parallel.
 
     fun init(otw: MNFT, ctx: &mut TxContext) {
         let keys = vector[
@@ -70,6 +73,7 @@ module mnft::mnft {
         let nft = M_NFT {
             id: object::new(ctx),
         };
+        assert!(supplyManager.current_supply < CAP_PER_SUPPLY_MANAGER, 0);
         supplyManager.current_supply = supplyManager.current_supply + 1;
         nft
     }
@@ -89,5 +93,25 @@ module mnft::mnft {
                 break
             }
         };
+    }
+    
+    #[allow(lint(self_transfer))]
+    public fun split_gas_coins<T>(
+        coin_input: Coin<T>,
+        amount: u64,
+        ctx: &mut TxContext,
+    ) {
+        let total = coin::value(&coin_input);
+        let split = total / amount;
+        let counter = 1;
+        loop {
+            // coin::split(coin_input, split);
+            let splitted_coin = coin::split(&mut coin_input, split, ctx);
+            transfer::public_transfer(splitted_coin, tx_context::sender(ctx));
+            if (counter == amount) {
+                break
+            }
+        };
+        transfer::public_transfer(coin_input, tx_context::sender(ctx));
     }
 }
