@@ -7,6 +7,7 @@ module mnft::mnft {
     use sui::transfer;
     use sui::package;
     use sui::display;
+    use std::vector;
 
     struct MNFT has drop {}
 
@@ -98,6 +99,26 @@ module mnft::mnft {
             }
         };
     }
+
+    public fun burn_nft (
+        nft: M_NFT,
+    ) {
+        let M_NFT {id, index: _} = nft;
+        object::delete(id);
+    }
+
+    public fun batch_burn_nfts (
+        nfts: vector<M_NFT>,
+    ) {
+        loop {
+            let nft = vector::pop_back<M_NFT>(&mut nfts);
+            burn_nft(nft);
+            if (0 == vector::length<M_NFT>(&nfts)) {
+                break
+            }
+        };
+        vector::destroy_empty(nfts);
+    }
     
     #[allow(lint(self_transfer))]
     public fun split_gas_coins<T>(
@@ -106,7 +127,6 @@ module mnft::mnft {
         balacne_each: u64,
         ctx: &mut TxContext,
     ) {
-        let total = coin::value(&coin_input);
         let counter = 0;
         loop {
             // coin::split(coin_input, split);

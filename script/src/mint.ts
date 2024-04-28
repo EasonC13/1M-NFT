@@ -5,6 +5,7 @@ import {
 import { Signer } from "./signer";
 import { config } from "dotenv";
 import { SuiClient, SuiObjectRef, getFullnodeUrl } from "@mysten/sui.js/client";
+import { SignatureWithBytes } from "@mysten/sui.js/dist/cjs/cryptography";
 
 config();
 
@@ -72,8 +73,6 @@ export async function main() {
       gasCoins.push(...gasCoin_s);
     }
 
-    console.log("=== Ends of preparation ===");
-
     const promises = [];
     console.log("gasCoins.length", gasCoins.length);
     console.log("supplyManagers.length", supplyManagers.length);
@@ -82,10 +81,8 @@ export async function main() {
         "Not enough gas coins for supply managers. Please run the ./prepare.ts script first."
       );
     }
-    console.log("Start!");
-    const time = Date.now();
-    let total_minted = 0;
-    let total_minted_by_counting_created_objects = 0;
+
+    const ListOfSignatureWithBytes: SignatureWithBytes[] = [];
 
     for (let index = 0; index < supplyManagers.length; index++) {
       let coinInput = gasCoins[index];
@@ -115,33 +112,11 @@ export async function main() {
                   ],
                 });
 
-                const block = await signer.signAndExecuteTransactionBlock({
-                  transactionBlock: txb,
-                  options: {
-                    showObjectChanges: true,
-                  },
-                }); //update the gas coin input
-                total_minted += 1000_000 / supplyManagers.length / chunk;
-                block.objectChanges?.forEach((change) => {
-                  if (change.type == "mutated" && change.objectType == SUI) {
-                    coinInput = {
-                      objectId: change.objectId,
-                      digest: change.digest,
-                      version: change.version,
-                    };
-                  }
+                const signatureWithBytes = await signer.signTransactionBlock({
+                  transactionBlockBytes: await txb.build({ client: suiClient }),
                 });
+                ListOfSignatureWithBytes.push(signatureWithBytes);
 
-                total_minted_by_counting_created_objects +=
-                  block.objectChanges?.filter((change: any) => {
-                    return (
-                      change.type == "created" &&
-                      change.objectType == `${packageId}::mnft::M_NFT`
-                    );
-                  }).length || 0;
-                // await suiClient.waitForTransactionBlock({
-                //   digest: block.digest,
-                // });
                 i++;
               } catch (e) {
                 // console.log("Error", e);
@@ -163,9 +138,53 @@ export async function main() {
       );
     }
 
-    for (const promise of promises) {
-      await promise;
+    await Promise.all(promises);
+
+    console.log("=== Ends of preparation ===");
+    console.log("Start!");
+    const time = Date.now();
+    let total_minted = 0;
+    let total_minted_by_counting_created_objects = 0;
+    const minted_nfts = [];
+
+    const SendTxPromises = [];
+    for (let index = 0; index < ListOfSignatureWithBytes.length; index++) {
+      let signatureWithBytes = ListOfSignatureWithBytes[index];
+      SendTxPromises.push(
+        (async () => {
+          while (1) {
+            try {
+              const block = await suiClient.executeTransactionBlock({
+                transactionBlock: signatureWithBytes.bytes,
+                signature: signatureWithBytes.signature,
+              });
+
+              total_minted += 1000_000 / supplyManagers.length / chunk;
+              total_minted_by_counting_created_objects +=
+                block.objectChanges?.filter(
+                  (change) =>
+                    change.type == "created" &&
+                    change.objectType == `${packageId}::mnft::NFT`
+                ).length || 0;
+
+              minted_nfts.push(
+                block.objectChanges?.filter(
+                  (change) =>
+                    change.type == "created" &&
+                    change.objectType == `${packageId}::mnft::NFT`
+                )
+              );
+
+              break;
+            } catch (e) {
+              console.log("Error", e);
+              continue;
+            }
+          }
+        })()
+      );
     }
+
     console.log({ total_minted, total_minted_by_counting_created_objects });
     const now = Date.now();
     console.log(
