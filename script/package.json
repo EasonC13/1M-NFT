@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "ts-node src/prepare.ts && ts-node src/mint.ts",
+    "start": "ts-node src/prepare.ts && ts-node --max-old-space-size=20480 src/mint.ts",
     "prepare": "ts-node src/prepare.ts",
-    "mint": "ts-node src/mint.ts"
+    "mint": "node -r ts-node/register --max-old-space-size=20480 src/mint.ts"
   },
   "dependencies": {
     "@mysten/sui.js": "^0.49.1",

@@ -11,7 +11,7 @@ config();
 export async function main() {
   try {
     const suiClient = new SuiClient({
-      url: process.env.SUI_ENDPOINT_TESTNET as any,
+      url: process.env.SUI_ENDPOINT_DEVNET as any,
     });
     const SUI = "0x2::sui::SUI";
     const signer = new Signer({
@@ -122,7 +122,7 @@ export async function main() {
       txb.setGasPayment([userCoinsObjectRef[0]]);
 
       for (let j = 0; j < coin_chunk; j++) {
-        const coin = txb.splitCoins(txb.gas, [txb.pure(3 * 10 ** 9, "u64")]);
+        const coin = txb.splitCoins(txb.gas, [txb.pure(10 * 10 ** 9, "u64")]);
         txb.transferObjects([coin], senderAddress);
       }
 
